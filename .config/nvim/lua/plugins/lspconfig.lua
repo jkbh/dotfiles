@@ -2,69 +2,76 @@ return {
 	'neovim/nvim-lspconfig',
 	event = { 'BufReadPre', 'BufNewFile' },
 	dependencies = {
+		'williamboman/mason.nvim',
+		'williamboman/mason-lspconfig.nvim',
 		"hrsh7th/cmp-nvim-lsp",
-		{ "j-hui/fidget.nvim", tag = 'legacy', opts = {} }
 	},
 	config = function()
-		local lspconfig = require('lspconfig')
-
+		local telescope = require('telescope.builtin')
 		local on_attach = function(_, bufnr)
 			local opts = { buffer = bufnr }
 			local keymap = require('vim.keymap')
 
-			keymap.set('n', 'K', vim.lsp.buf.hover, opts)
-			keymap.set('n', 'gd', vim.lsp.buf.definition, opts)
+			-- Edit Actions
 			keymap.set('n', '<leader>rn', vim.lsp.buf.rename, opts)
+			keymap.set('n', '<leader>ca', vim.lsp.buf.code_action, opts)
 
+			-- Analysis
+			keymap.set('n', 'gd', telescope.lsp_definitions, opts)
+			keymap.set('n', 'gr', telescope.lsp_references, opts)
+			keymap.set('n', 'gI', telescope.lsp_implementations, opts)
 
+			-- Hover
+			keymap.set('n', 'K', vim.lsp.buf.hover, opts)
+
+			-- Create :Format command
 			vim.api.nvim_buf_create_user_command(bufnr, 'Format', function(_)
 				vim.lsp.buf.format()
 			end, { desc = 'Format buffer with LSP' })
 		end
 
-		local capabilities = require('cmp_nvim_lsp').default_capabilities()
+		require('mason').setup()
+		require('mason-lspconfig').setup()
 
-		lspconfig['rust_analyzer'].setup {
-			on_attach = on_attach,
-			capabilities = capabilities,
-		}
-
-		lspconfig['lua_ls'].setup {
-			on_attach = on_attach,
-			capabilities = capabilities,
-			settings = {
-				Lua = {
-					diagnostics = {
-						globals = { 'vim' }
+		local servers = {
+			ruff_lsp = {},
+			jedi_language_server = {},
+			rust_analyzer = {
+				['rust-analyzer'] = {
+					check = {
+						command = "clippy"
 					},
-					workspace = {
-						library = {
-							[vim.fn.expand('$VIMRUNTIME/lua')] = true,
-							[vim.fn.stdpath('config') .. '/lua'] = true,
+					imports = {
+						granularity = {
+							group = "module"
 						}
 					}
 				}
+			},
+			lua_ls = {
+				Lua = {
+					workspace = { checkThirdParty = false },
+					telemetry = { enable = false },
+					diagnostics = { disable = { 'missing-fields' } },
+				},
 			}
 		}
 
-		local texlab_on_attach = function(_, bufnr)
-			on_attach(_, bufnr)
-			local opts = { buffer = bufnr }
-			vim.keymap.set('n', '<leader>lb', '<cmd>TexlabBuild<CR>', opts)
-		end
-		lspconfig['texlab'].setup {
-			on_attach = texlab_on_attach,
-			capabilities = capabilities,
-			settings = {
-				texlab = {
-					build = {
-						onSave = true
-					},
-					chktex = {
-						onOpenAndSave = true
-					}
+		local capabilities = require('cmp_nvim_lsp').default_capabilities()
+
+		require('mason-lspconfig').setup {
+			ensure_installed = vim.tbl_keys(servers)
+		}
+
+		require('mason-lspconfig').setup_handlers {
+			function(server_name)
+				require('lspconfig')[server_name].setup {
+					capabilities = capabilities,
+					on_attach = on_attach,
+					settings = servers[server_name],
+					file_types = (servers[server_name] or {}).filetypes,
 				}
-			}
+			end
 		}
 		-- Create an augroup that is used for managing our formatting autocmds.
 		--      We need one augroup per client to make sure that multiple clients
@@ -123,7 +130,4 @@ return {
 			end,
 		})
 	end
-
-
-
 }
