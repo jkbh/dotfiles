@@ -17,10 +17,11 @@ return {
 	-- 	end
 	-- },
 	{
-		"ellisonleao/gruvbox.nvim",
+		-- "ellisonleao/gruvbox.nvim",
+		'wuelnerdotexe/vim-enfocado',
 		priority = 1000,
 		config = function()
-			vim.cmd [[colorscheme gruvbox]]
+			vim.cmd [[colorscheme enfocado]]
 		end,
 	},
 	{
